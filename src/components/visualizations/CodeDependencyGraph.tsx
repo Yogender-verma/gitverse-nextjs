@@ -376,20 +376,24 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         💡 Drag nodes to reposition • Scroll to zoom • Hover for details
       </p>
       <div
-        ref={tooltipRef}
-        className="fixed p-3 rounded-lg pointer-events-none shadow-xl border"
-        style={{
-          opacity: 0,
-          display: "none",
-          backgroundColor: "rgba(0, 0, 0, 0.9)",
-          color: "white",
-          zIndex: 9999,
-          backdropFilter: "blur(8px)",
-          transform: "translate(-250px, -250px)",
-          left: "0px",
-          top: "0px",
-        }}
-      />
+  ref={tooltipRef}
+  className="
+    fixed p-3 rounded-lg pointer-events-none shadow-xl border
+    translate-x-[-120px] translate-y-[-120px]
+    sm:translate-x-[-250px] sm:translate-y-[-250px]
+  "
+  style={{
+    opacity: 1, // control with state later
+    backgroundColor: "rgba(0, 0, 0, 0.9)",
+    color: "white",
+    zIndex: 9999,
+    backdropFilter: "blur(8px)",
+    left: "0px",
+    top: "0px",
+    whiteSpace: "nowrap",
+  }}
+/>
+
     </Card>
   );
 }

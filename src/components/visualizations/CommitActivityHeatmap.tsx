@@ -452,22 +452,25 @@ export function CommitActivityHeatmap({
         </div>
       )}
 
-      <div
-        ref={tooltipRef}
-        className="fixed p-3 rounded-lg pointer-events-none shadow-xl border"
-        style={{
-          opacity: 0,
-          display: "none",
-          backgroundColor: "rgba(0, 0, 0, 0.9)",
-          color: "white",
-          zIndex: 9999,
-          backdropFilter: "blur(8px)",
-          transform: "translate(-400px, -400px)",
-          left: "0px",
-          top: "0px",
-          whiteSpace: "nowrap",
-        }}
-      />
+<div
+  ref={tooltipRef}
+  className="
+    fixed p-3 rounded-lg pointer-events-none shadow-xl border
+    translate-x-[-100px] translate-y-[-200px]
+    sm:translate-x-[-350px] sm:translate-y-[-320px]
+  "
+  style={{
+    opacity: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.9)",
+    color: "white",
+    zIndex: 9999,
+    backdropFilter: "blur(8px)",
+    left: "0px",
+    top: "0px",
+    whiteSpace: "nowrap",
+  }}
+/>
+
     </Card>
   );
 }

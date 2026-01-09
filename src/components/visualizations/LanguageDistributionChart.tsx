@@ -255,20 +255,24 @@ export function LanguageDistributionChart({
         )}
       </div>
       <div
-        ref={tooltipRef}
-        className="fixed p-4 rounded-lg pointer-events-none shadow-xl border"
-        style={{
-          opacity: 0,
-          display: "none",
-          backgroundColor: "rgba(0, 0, 0, 0.9)",
-          color: "white",
-          zIndex: 9999,
-          backdropFilter: "blur(8px)",
-          transform: "translate(-400px, -400px)",
-          left: "0px",
-          top: "0px",
-        }}
-      />
+  ref={tooltipRef}
+  className="
+    fixed p-4 rounded-lg pointer-events-none shadow-xl border
+    translate-x-[-140px] translate-y-[-140px]
+    sm:translate-x-[-300px] sm:translate-y-[-300px]
+  "
+  style={{
+    opacity: 1, // control later with state
+    backgroundColor: "rgba(0, 0, 0, 0.9)",
+    color: "white",
+    zIndex: 9999,
+    backdropFilter: "blur(8px)",
+    left: "0px",
+    top: "0px",
+    whiteSpace: "nowrap",
+  }}
+/>
+
     </Card>
   );
 }
