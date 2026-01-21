@@ -20,9 +20,10 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui";
-import { Button } from "@/components/ui";
-import { useState } from "react";
-import { buildApiUrl } from "@/services/apiConfig";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 
 interface RepositoryData {
   id: string;
@@ -49,13 +50,10 @@ interface RepositoryOverviewProps {
 export const RepositoryOverview = ({
   repositoryData,
 }: RepositoryOverviewProps) => {
-  const [readmeText, setReadmeText] = useState<string | null>(
-    repositoryData?.readmeText ?? null,
-  );
-  const [readmePath, setReadmePath] = useState<string | null>(
-    repositoryData?.readmePath ?? null,
-  );
-  const [isFetchingReadme, setIsFetchingReadme] = useState(false);
+  // IMPORTANT: derive README directly from props so it always matches the
+  // currently-selected repository (avoids showing stale README when navigating).
+  const readmeText: string | null = repositoryData?.readmeText ?? null;
+  const readmePath: string | null = repositoryData?.readmePath ?? null;
 
   // Calculate total lines of code from languages only
   const totalLines =
@@ -141,37 +139,75 @@ export const RepositoryOverview = ({
     color: getLanguageColor(lang.name),
   }));
 
-  const fetchReadme = async () => {
-    if (!repositoryData?.id) return;
-    setIsFetchingReadme(true);
-    try {
-      const token =
-        typeof window !== "undefined"
-          ? localStorage.getItem("gitverse_token")
-          : null;
+  const hasUsableReadme = Boolean(readmeText && readmeText !== "doesnt exist");
 
-      const res = await fetch(
-        buildApiUrl(`/api/repositories/${repositoryData.id}/readme`),
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        },
-      );
+  const githubRawBase = (() => {
+    const url = String(repositoryData?.url || "");
+    const m = url.match(
+      /^https?:\/\/github\.com\/([^\/]+)\/([^\/]+?)(?:\.git)?\/?$/i,
+    );
+    if (!m) return null;
+    const owner = m[1];
+    const repo = m[2];
+    const branch = String(repositoryData?.defaultBranch || "main");
+    return `https://raw.githubusercontent.com/${owner}/${repo}/${encodeURIComponent(branch)}/`;
+  })();
 
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data?.error || "Failed to fetch README");
-      }
+  const githubBlobBase = (() => {
+    const url = String(repositoryData?.url || "");
+    const m = url.match(
+      /^https?:\/\/github\.com\/([^\/]+)\/([^\/]+?)(?:\.git)?\/?$/i,
+    );
+    if (!m) return null;
+    const owner = m[1];
+    const repo = m[2];
+    const branch = String(repositoryData?.defaultBranch || "main");
+    return `https://github.com/${owner}/${repo}/blob/${encodeURIComponent(branch)}/`;
+  })();
 
-      setReadmeText(data?.repository?.readmeText ?? null);
-      setReadmePath(data?.repository?.readmePath ?? null);
-    } finally {
-      setIsFetchingReadme(false);
+  const resolveRepoRelativeUrl = (raw: string, kind: "image" | "link") => {
+    if (!raw) return raw;
+    const v = raw.trim();
+    if (
+      v.startsWith("http://") ||
+      v.startsWith("https://") ||
+      v.startsWith("data:") ||
+      v.startsWith("mailto:") ||
+      v.startsWith("#")
+    ) {
+      return v;
     }
+
+    const base = kind === "image" ? githubRawBase : githubBlobBase;
+    if (!base) return v;
+
+    // Handle absolute-from-repo-root paths like "/assets/logo.png".
+    const pathPart = v.startsWith("/") ? v.slice(1) : v;
+    return `${base}${pathPart}`;
   };
+
+  const readmeSanitizeSchema = (() => {
+    // Allow common README HTML (like <img align="right" ...>) while keeping things safe.
+    const schema: any = {
+      ...(defaultSchema as any),
+      tagNames: Array.from(
+        new Set([...(defaultSchema as any).tagNames, "img"]),
+      ),
+      attributes: {
+        ...((defaultSchema as any).attributes || {}),
+        a: Array.from(
+          new Set([
+            ...(((defaultSchema as any).attributes?.a as any[]) || []),
+            "target",
+            "rel",
+          ]),
+        ),
+        img: ["src", "alt", "title", "width", "height", "align", "loading"],
+      },
+    };
+
+    return schema;
+  })();
 
   const formatTimeAgo = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -387,35 +423,164 @@ export const RepositoryOverview = ({
               README
             </CardTitle>
             <CardDescription className="text-xs sm:text-sm">
-              {readmePath
-                ? `Showing ${readmePath}`
-                : "Fetch and view the repository README"}
+              {readmePath ? `Showing ${readmePath}` : "README"}
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0 space-y-3">
-            {readmeText ? (
-              <pre className="whitespace-pre-wrap text-xs sm:text-sm leading-relaxed bg-background/50 border border-border/50 rounded-lg p-3 max-h-96 overflow-auto">
-                {readmeText}
-              </pre>
+            {hasUsableReadme ? (
+              <div className="bg-background/50 border border-border/50 rounded-lg p-3 max-h-96 overflow-auto text-sm leading-relaxed">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[
+                    rehypeRaw,
+                    [rehypeSanitize, readmeSanitizeSchema],
+                  ]}
+                  components={{
+                    h1: (props) => (
+                      <h1
+                        className="text-xl sm:text-2xl font-bold mt-2 mb-3"
+                        {...props}
+                      />
+                    ),
+                    h2: (props) => (
+                      <h2
+                        className="text-lg sm:text-xl font-semibold mt-5 mb-2"
+                        {...props}
+                      />
+                    ),
+                    h3: (props) => (
+                      <h3
+                        className="text-base sm:text-lg font-semibold mt-4 mb-2"
+                        {...props}
+                      />
+                    ),
+                    p: (props) => (
+                      <p className="my-2 text-sm leading-relaxed" {...props} />
+                    ),
+                    a: ({ href, children, ...props }) => (
+                      <a
+                        href={resolveRepoRelativeUrl(
+                          String(href || ""),
+                          "link",
+                        )}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline underline-offset-2"
+                        {...props}
+                      >
+                        {children}
+                      </a>
+                    ),
+                    img: ({ src, alt, title, ...props }) => {
+                      const resolved = resolveRepoRelativeUrl(
+                        String(src || ""),
+                        "image",
+                      );
+                      const align = (props as any)?.align as
+                        | "left"
+                        | "right"
+                        | "center"
+                        | undefined;
+
+                      const floatClass =
+                        align === "right"
+                          ? "float-right ml-4"
+                          : align === "left"
+                            ? "float-left mr-4"
+                            : "";
+
+                      return (
+                        <img
+                          src={resolved}
+                          alt={alt || ""}
+                          title={title}
+                          loading="lazy"
+                          className={`max-w-full h-auto rounded-md my-3 ${floatClass}`}
+                          {...props}
+                        />
+                      );
+                    },
+                    code: ({ className, children, ...props }) => {
+                      const isBlock = Boolean(className);
+                      if (!isBlock) {
+                        return (
+                          <code
+                            className="px-1 py-0.5 rounded bg-black/30 text-xs"
+                            {...props}
+                          >
+                            {children}
+                          </code>
+                        );
+                      }
+
+                      return (
+                        <code
+                          className={`block whitespace-pre-wrap text-xs leading-relaxed ${className || ""}`}
+                          {...props}
+                        >
+                          {children}
+                        </code>
+                      );
+                    },
+                    pre: (props) => (
+                      <pre
+                        className="my-3 p-3 rounded-lg bg-black/30 overflow-auto"
+                        {...props}
+                      />
+                    ),
+                    ul: (props) => (
+                      <ul
+                        className="list-disc pl-6 my-2 space-y-1"
+                        {...props}
+                      />
+                    ),
+                    ol: (props) => (
+                      <ol
+                        className="list-decimal pl-6 my-2 space-y-1"
+                        {...props}
+                      />
+                    ),
+                    li: (props) => <li className="text-sm" {...props} />,
+                    hr: (props) => (
+                      <hr className="my-4 border-border/50" {...props} />
+                    ),
+                    blockquote: (props) => (
+                      <blockquote
+                        className="border-l-2 border-border/60 pl-3 my-3 text-muted-foreground"
+                        {...props}
+                      />
+                    ),
+                    table: (props) => (
+                      <div className="my-3 overflow-auto">
+                        <table
+                          className="min-w-full text-sm border border-border/50"
+                          {...props}
+                        />
+                      </div>
+                    ),
+                    th: (props) => (
+                      <th
+                        className="text-left font-semibold p-2 border-b border-border/50 bg-black/20"
+                        {...props}
+                      />
+                    ),
+                    td: (props) => (
+                      <td
+                        className="p-2 border-b border-border/30"
+                        {...props}
+                      />
+                    ),
+                  }}
+                >
+                  {readmeText || ""}
+                </ReactMarkdown>
+                <div className="clear-both" />
+              </div>
             ) : (
               <div className="text-sm text-muted-foreground">
-                No README stored yet.
+                No README found for this repository.
               </div>
             )}
-
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                onClick={fetchReadme}
-                disabled={isFetchingReadme}
-                className="bg-gradient-primary"
-              >
-                {isFetchingReadme ? "Fetching…" : "Fetch README"}
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                Stored in DB for faster reuse.
-              </span>
-            </div>
           </CardContent>
         </Card>
       </div>

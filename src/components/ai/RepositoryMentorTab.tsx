@@ -20,6 +20,26 @@ export function RepositoryMentorTab(props: { repositoryData?: any }) {
 
   const readmeText: string | null = repositoryData?.readmeText ?? null;
 
+  const contributors = useMemo(() => {
+    const raw = Array.isArray(repositoryData?.contributors)
+      ? repositoryData.contributors
+      : [];
+    return raw.map((c: any) => ({
+      name: c?.name ?? c?.authorName ?? null,
+      email: c?.email ?? c?.authorEmail ?? null,
+      commits:
+        typeof c?.commits === "number" ? c.commits : Number(c?.commits ?? 0),
+      additions:
+        typeof c?.additions === "number"
+          ? c.additions
+          : Number(c?.additions ?? 0),
+      deletions:
+        typeof c?.deletions === "number"
+          ? c.deletions
+          : Number(c?.deletions ?? 0),
+    }));
+  }, [repositoryData?.contributors]);
+
   return (
     <div className="space-y-6">
       <AIRepoMentorSection
@@ -28,6 +48,7 @@ export function RepositoryMentorTab(props: { repositoryData?: any }) {
         description={description}
         languages={languageNames}
         readmeText={readmeText}
+        contributors={contributors}
       />
     </div>
   );
