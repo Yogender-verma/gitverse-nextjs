@@ -150,9 +150,9 @@ export default function SearchPage() {
 
         {/* Repository Grid/List */}
         {loading ? (
-          <div className="text-center py-12 text-muted-foreground">
-            Loading repositories...
-          </div>
+         <div className="flex items-center justify-center py-12 text-muted-foreground animate-pulse">
+  Loading repositories...
+</div>
         ) : sortedRepositories.length === 0 ? (
           searchQuery ? (
             <EmptyState
