@@ -12,6 +12,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+        const user = await getAuthUser(request);
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "Not authenticated" },
+        { status: 401 });
+    }
+
 const contentLength = request.headers.get("content-length");
 
 if (
@@ -19,6 +27,16 @@ if (
   contentType.includes("application/json") &&
   contentLength !== "0"
 ) {
+
+  const MAX_BODY_SIZE = 1024;
+
+if (contentLength && Number(contentLength) > MAX_BODY_SIZE) {
+  return NextResponse.json(
+    { error: "Request body too large" },
+    { status: 413 }
+  );
+}
+
   const rawBody = await request.text();
 
   // Only validate JSON when body actually exists
@@ -33,14 +51,6 @@ if (
     }
   }
 }
-    //Authentication user
-    const user = await getAuthUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401 });
-    }
 
   //Logout response
 
