@@ -41,9 +41,18 @@ Paste a repo → GitVerse builds a visual map + AI onboarding so contributors ca
 - Ask AI questions about files, folders, and architecture
 - Generate analysis jobs and track progress
 
-## Supported Node Version
+## Getting Started
 
-This project officially supports **Node.js 22.x** (as specified in [package.json](package.json)).
+The canonical onboarding and setup guide is:
+
+- [GETTING_STARTED.md](./GETTING_STARTED.md)
+
+Additional setup docs:
+
+- [START_HERE.md](./START_HERE.md)
+- [GOOGLE_OAUTH_SETUP.md](./GOOGLE_OAUTH_SETUP.md)
+- [GOOGLE_OAUTH_INTEGRATION.md](./GOOGLE_OAUTH_INTEGRATION.md)
+- [QUICKSTART_OAUTH.md](./QUICKSTART_OAUTH.md)
 
 ## Quickstart (local dev)
 
