@@ -252,12 +252,12 @@ export class RepositoryService {
       const existingCommits =
         commits.length > 0
           ? await prisma.commit.findMany({
-              where: {
-                repositoryId,
-                hash: { in: commits.map((c) => c.hash) },
-              },
-              select: { hash: true },
-            })
+            where: {
+              repositoryId,
+              hash: { in: commits.map((c) => c.hash) },
+            },
+            select: { hash: true },
+          })
           : [];
       const existingHashes = new Set(existingCommits.map((c) => c.hash));
 
