@@ -25,7 +25,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "test:validation": "tsx scripts/test-validation.ts"
+    "test:validation": "tsx scripts/test-validation.ts",
+    "validate-env": "tsx scripts/validate-env.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
