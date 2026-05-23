@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 
 interface ModalProps {
@@ -16,18 +16,8 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   size = 'md',
 }) => {
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = 'unset'
-    }
-    return () => {
-      document.body.style.overflow = 'unset'
-    }
-  }, [isOpen])
-
-  if (!isOpen) return null
+  const modalRef = useRef<HTMLDivElement>(null)
+  const lastFocusedElement = useRef<HTMLElement | null>(null)
 
   const sizeStyles = {
     sm: 'max-w-md',
@@ -36,17 +26,38 @@ export const Modal: React.FC<ModalProps> = ({
     xl: 'max-w-4xl'
   }
 
+  // lock body scroll
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [isOpen])
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-screen items-center justify-center p-4">
+
         {/* Backdrop */}
         <div
           className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
           onClick={onClose}
         />
-        
+
         {/* Modal */}
-        <div className={`relative bg-white dark:bg-secondary-800 rounded-xl shadow-xl ${sizeStyles[size]} w-full`}>
+        <div
+          ref={modalRef}
+          onKeyDown={handleKeyDown}
+          role="dialog"
+          aria-modal="true"
+          className={`relative bg-white dark:bg-secondary-800 rounded-xl shadow-xl ${sizeStyles[size]} w-full`}
+        >
+
           {/* Header */}
           {title && (
             <div className="flex items-center justify-between p-6 border-b border-secondary-200 dark:border-secondary-700">
@@ -61,11 +72,12 @@ export const Modal: React.FC<ModalProps> = ({
               </button>
             </div>
           )}
-          
+
           {/* Content */}
           <div className="p-6">
             {children}
           </div>
+
         </div>
       </div>
     </div>
