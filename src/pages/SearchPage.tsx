@@ -157,6 +157,7 @@ finally {
           </p>
         </div>
 
+<<<<<<< HEAD
         {/* Repository Grid/List */}
 <<<<<<< HEAD
         {loading ? (
@@ -175,6 +176,10 @@ finally {
 </div>
 =======
        {loading ? (
+=======
+       {/* Repository Grid/List */}
+{loading ? (
+>>>>>>> temp-fix
   <div className="text-center py-12 text-muted-foreground">
     Loading repositories...
   </div>
@@ -183,6 +188,7 @@ finally {
     {error}
   </div>
 ) : sortedRepositories.length === 0 ? (
+<<<<<<< HEAD
           searchQuery ? (
             <EmptyState
               icon={Search}
@@ -206,6 +212,30 @@ finally {
           )
 >>>>>>> upstream/main
         ) : viewMode === "grid" ? (
+=======
+  searchQuery ? (
+    <EmptyState
+      icon={Search}
+      title="No repositories found"
+      description="We couldn't find any repositories matching your search query. Try adjusting your search term."
+      suggestions={[
+        "Try another repository",
+        "Check the GitHub username",
+      ]}
+      actionLabel="Clear Search"
+      onAction={() => setSearchQuery("")}
+    />
+  ) : (
+    <EmptyState
+      icon={GitBranch}
+      title="No Repositories Yet"
+      description="You haven't analyzed any repositories. Head to the dashboard to get started!"
+      actionLabel="Go to Dashboard"
+      onAction={() => router.push("/dashboard")}
+    />
+  )
+) : viewMode === "grid" ? (
+>>>>>>> temp-fix
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {sortedRepositories.map((repo, index) => (
               <Card
