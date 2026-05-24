@@ -4,6 +4,7 @@ import * as path from "path";
 import * as os from "os";
 import * as crypto from "crypto";
 import * as fs from "fs/promises";
+import { FileChangeType } from "@prisma/client";
 
 function yieldIfHighMemory(threshold = 0.7): Promise<void> {
   const usage = process.memoryUsage();
@@ -376,7 +377,7 @@ export class RepositoryService {
               path: change.path,
               additions: change.additions,
               deletions: change.deletions,
-              changeType: change.changeType,
+              changeType: change.changeType.toUpperCase() as FileChangeType,
               commitId,
             }));
             },
@@ -569,6 +570,8 @@ export class RepositoryService {
       // Cleanup cloned repository
       if (gitService) {
         await gitService.cleanup();
+      } else {
+        await fs.rm(tempDir, { recursive: true, force: true }).catch(() => null);
       }
     }
   }
