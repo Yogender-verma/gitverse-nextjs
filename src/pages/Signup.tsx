@@ -278,7 +278,14 @@ export default function Signup() {
                   type="text"
                   placeholder="John Doe"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value);
+
+                    setErrors((prev) => ({
+                      ...prev,
+                      name: "",
+                    }));
+                  }}
                   className="pl-10"
                   required
                 />
@@ -305,7 +312,14 @@ export default function Signup() {
                   type="email"
                   placeholder="you@example.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+
+                    setErrors((prev) => ({
+                      ...prev,
+                      email: "",
+                    }));
+                  }}
                   className="pl-10"
                   required
                 />
@@ -333,7 +347,14 @@ export default function Signup() {
                   type="password"
                   placeholder="••••••••"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+
+                    setErrors((prev) => ({
+                      ...prev,
+                      password: "",
+                    }));
+                  }}
                   className="pl-10"
                   required
                 />
@@ -362,7 +383,14 @@ export default function Signup() {
                   type="password"
                   placeholder="••••••••"
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+
+                    setErrors((prev) => ({
+                      ...prev,
+                      confirmPassword: "",
+                    }));
+                  }}
                   className="pl-10"
                   required
                 />
@@ -401,7 +429,14 @@ export default function Signup() {
                 type="checkbox"
                 className="mr-2 mt-0.5 rounded border-input"
                 checked={agreedToTerms}
-                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                onChange={(e) => {
+                  setAgreedToTerms(e.target.checked);
+
+                  setErrors((prev) => ({
+                    ...prev,
+                    terms: "",
+                  }));
+                }}
               />
               <span className="text-muted-foreground">
                 I agree to the{" "}
