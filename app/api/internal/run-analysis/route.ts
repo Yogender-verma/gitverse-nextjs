@@ -5,8 +5,11 @@ import { repositoryService } from "@/lib/services/repositoryService";
 
 export const runtime = "nodejs";
 
-function isAuthorized(request: NextRequest): boolean {
-  const configuredSecret = process.env.ANALYSIS_RUNNER_SECRET;
+// Global catch — prevents Node 15+ from crashing the request on an
+// unhandled rejection that made it past the promise-gap fixes above.
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection in run-analysis route:", reason);
+});
 
   // Fail-closed: if no secret is configured in production, deny all requests.
   // An unset secret must never silently open access in any deployed environment.
@@ -31,6 +34,31 @@ function isAuthorized(request: NextRequest): boolean {
 
   // Also accept the value in the custom header for non-cron callers
   // (e.g. a GitHub Actions workflow or an internal service).
+const HEARTBEAT_INTERVAL_MS = 30_000;
+
+function isAuthorized(request: NextRequest): boolean {
+  const configuredSecret = process.env.ANALYSIS_RUNNER_SECRET;
+
+  // When no secret is configured, allow in dev or via Vercel Cron on Vercel.
+  if (!configuredSecret) {
+    if (process.env.NODE_ENV !== "production") return true;
+
+    const ua = (request.headers.get("user-agent") || "").toLowerCase();
+    if (
+      request.method === "GET" &&
+      process.env.VERCEL === "1" &&
+      process.env.VERCEL_ENV === "production" &&
+      ua.includes("vercel-cron/")
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // When a secret is configured, always require it, regardless of
+  // HTTP method or User-Agent. Vercel Cron jobs should include the
+  // secret as a query parameter in the cron path.
   const headerSecret = request.headers.get("x-analysis-runner-secret");
   if (headerSecret === configuredSecret) return true;
 
@@ -49,6 +77,8 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
     return new NextResponse(null, { status: 204 });
   }
 
+  let heartbeatTimer: NodeJS.Timeout | null = null;
+
   try {
     await analysisJobService.updateProgress({
       jobId: job.id,
@@ -58,6 +88,12 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
         progressMessage: job.progressMessage ?? "Processing",
       },
     });
+
+    heartbeatTimer = setInterval(() => {
+      analysisJobService
+        .heartbeat({ jobId: job.id, workerId })
+        .catch((e) => console.error("serverless heartbeat failed", e));
+    }, HEARTBEAT_INTERVAL_MS);
 
     await repositoryService.analyzeRepository(job.repositoryId, {
       onProgress: async (update) => {
@@ -69,10 +105,16 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
       },
     });
 
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+
     await analysisJobService.markDone({ jobId: job.id, workerId });
 
     return NextResponse.json({ ok: true, jobId: job.id, status: "DONE" });
   } catch (error: any) {
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+
     const message = String(error?.message || error || "Unknown error");
 
     await analysisJobService.markFailed({
