@@ -152,6 +152,17 @@ export class RepositoryService {
       return existingRepository;
     }
 
+    const existingRepositoryName = await prisma.repository.findFirst({
+  where: {
+    name: input.name,
+    userId: input.userId,
+  },
+});
+
+if (existingRepositoryName) {
+  throw new Error("Repository with this name already exists");
+}
+
     const repository = await prisma.repository.create({
       data: {
         name: input.name,
