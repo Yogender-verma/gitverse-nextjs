@@ -16,7 +16,7 @@ interface Repository {
 }
 
 interface CodeDependencyGraphProps {
-  repository?: Repository;
+  repository?: any;
 }
 
 export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
@@ -70,33 +70,6 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       toast.error("Failed to export the graph. Please try again.", { id: toastId });
     } finally {
       setIsExporting(false);
-    }
-  };
-
-  const handleZoomIn = () => {
-    if (svgSelectionRef.current && zoomRef.current) {
-      svgSelectionRef.current
-        .transition()
-        .duration(300)
-        .call(zoomRef.current.scaleBy, 1.3);
-    }
-  };
-
-  const handleZoomOut = () => {
-    if (svgSelectionRef.current && zoomRef.current) {
-      svgSelectionRef.current
-        .transition()
-        .duration(300)
-        .call(zoomRef.current.scaleBy, 1 / 1.3);
-    }
-  };
-
-  const handleReset = () => {
-    if (svgSelectionRef.current && zoomRef.current) {
-      svgSelectionRef.current
-        .transition()
-        .duration(500)
-        .call(zoomRef.current.transform, d3.zoomIdentity);
     }
   };
 
@@ -311,10 +284,6 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       });
 
     svg.call(zoom as any);
-
-    // Save D3 zoom behavior and SVG selection for programmatic triggers
-    zoomRef.current = zoom;
-    svgSelectionRef.current = svg;
 
     // Animate nodes on load
     node
