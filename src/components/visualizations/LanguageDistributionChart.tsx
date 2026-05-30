@@ -154,13 +154,15 @@ export function LanguageDistributionChart({
               .style("top", `${y}px`);
         }
       })
-      .on("mouseleave", function () {
+      .on("mouseleave", function (_event, _d) {
            g.selectAll("path")
            .interrupt()
            .style("opacity", 1);
            d3.select(this)
+          .attr("d", (datum: any) => arc(datum) || "")
           .attr("stroke", "rgba(0,0,0,0.5)")
           .attr("stroke-width", 2)
+          .style("filter", "none");  
         if (tooltipRef.current) {
           d3.select(tooltipRef.current)
             .style("opacity", "0")
@@ -260,7 +262,6 @@ export function LanguageDistributionChart({
              ref={tooltipRef}
              className="absolute p-4 rounded-lg pointer-events-none shadow-xl border border-gray-700/50"
              style={{
-              //position: "fixed",
              opacity: 0, // control later with state
               display: "none",
              backgroundColor: "rgba(0, 0, 0, 0.9)",
