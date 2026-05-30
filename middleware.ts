@@ -79,6 +79,6 @@ export const config = {
      * api/          -- API routes use per-handler requireAuth()
      * public files  -- explicitly ignore common static asset extensions to save Edge compute
      */
-    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|txt|xml)$|api/).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:[Ss][Vv][Gg]|[Pp][Nn][Gg]|[Jj][Pp][Ee]?[Gg]|[Gg][Ii][Ff]|[Ww][Ee][Bb][Pp]|[Tt][Xx][Tt]|[Xx][Mm][Ll])$|api/).*)",
   ],
 };
