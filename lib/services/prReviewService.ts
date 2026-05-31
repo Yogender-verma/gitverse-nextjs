@@ -209,7 +209,6 @@ export async function reviewPullRequest(params: {
   number: number;
   githubToken?: string;
   repositoryId?: number;
-}): Promise<{ review: PRReviewResponse; prTitle: string; prUrl: string }> {
   timeoutEstimator?: TimeoutEstimatorService;
 }): Promise<{ review: PRReviewResponse; prTitle: string; prUrl: string; tokensConsumed?: number }> {
   const github = new GitHubService(params.githubToken);
@@ -259,7 +258,7 @@ export async function reviewPullRequest(params: {
     }
   }
 
-  const prompt = `You are a senior code reviewer. Review the following GitHub Pull Request changes.
+
     if (!diff) {
       if (totalChunks === 1) {
         throw new Error("PR diff is unavailable (no patch content returned).");
