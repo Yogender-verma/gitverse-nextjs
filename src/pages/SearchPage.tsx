@@ -169,13 +169,17 @@ finally {
 
  <DropdownMenu>
   <DropdownMenuTrigger asChild>
-    <Button variant="outline" size="sm">
-      {sortBy === "recent"
-        ? "Recent"
-        : sortBy === "stars"
-        ? "Most Stars"
-        : "Name"}
-    </Button>
+    <Button
+  variant="outline"
+  size="sm"
+  aria-label="Sort repositories"
+>
+  {sortBy === "recent"
+    ? "Recent"
+    : sortBy === "stars"
+    ? "Most Stars"
+    : "Name"}
+</Button>
   </DropdownMenuTrigger>
 
   <DropdownMenuContent align="end">
