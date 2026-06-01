@@ -5,6 +5,11 @@ import { Card } from "@/components/ui";
 import { GraphAnalyzer } from "@/utils/graphAnalyzer";
 import { MapControls } from "./MapControls";
 import { toast } from "sonner";
+import { annotationService, MapAnnotation } from "@/services/annotationService";
+import { AnnotationMarker } from "../map/AnnotationMarker";
+import { AnnotationPopover } from "../map/AnnotationPopover";
+import { AnnotationPanel } from "../map/AnnotationPanel";
+import { MessageSquarePlus } from "lucide-react";
 
 interface RepositoryFile {
   path: string;
@@ -27,6 +32,15 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   const zoomRef = useRef<any>(null);
   const svgSelectionRef = useRef<any>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
+  
+  const [annotations, setAnnotations] = useState<MapAnnotation[]>([]);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [popover, setPopover] = useState<{ isOpen: boolean, x: number, y: number, initialData?: Partial<MapAnnotation>, targetId?: string, targetType?: 'node'|'edge' } | null>(null);
+  const nodesRef = useRef<any[]>([]);
+  const linksRef = useRef<any[]>([]);
+  // Dummy state to force render during tick
+  const [, setTick] = useState(0);
   
   const graphAnalyzer = new GraphAnalyzer();
   const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
@@ -74,6 +88,29 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   };
 
   useEffect(() => {
+    if (!repository?.id) return;
+    annotationService.getAnnotations(repository.id).then(setAnnotations);
+    
+    const unsubscribe = annotationService.subscribeToAnnotations(repository.id, (event) => {
+      if (event.type === 'created' || event.type === 'updated') {
+        setAnnotations(prev => {
+          const idx = prev.findIndex(a => a.id === event.annotation.id);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = event.annotation;
+            return next;
+          }
+          return [...prev, event.annotation];
+        });
+      } else if (event.type === 'deleted') {
+        setAnnotations(prev => prev.filter(a => a.id !== event.annotationId));
+      }
+    });
+
+    return () => unsubscribe();
+  }, [repository?.id]);
+
+  useEffect(() => {
     if (!svgRef.current) return;
 
     // If no data, show empty state
@@ -115,6 +152,8 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     // Prepare data
     const nodes = graphData.nodes.map((d) => ({ ...d }));
     const links = graphData.links.map((d) => ({ ...d }));
+    nodesRef.current = nodes;
+    linksRef.current = links;
 
     // Create force simulation
     const simulation = d3
@@ -145,7 +184,17 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       )
       .attr("stroke-width", (d: any) => d.strength * 2)
       .attr("stroke-dasharray", (d: any) => (d.isCyclic ? "5,5" : "none"))
-      .attr("stroke-opacity", 0.6);
+      .attr("stroke-opacity", 0.6)
+      .on("contextmenu", (event: any, d: any) => {
+        event.preventDefault();
+        setPopover({
+          isOpen: true,
+          x: event.clientX,
+          y: event.clientY,
+          targetId: `${d.source.id}->${d.target.id}`,
+          targetType: 'edge'
+        });
+      });
 
     // Draw nodes
     const node = g
@@ -171,7 +220,17 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             d.fx = null;
             d.fy = null;
           }),
-      );
+      )
+      .on("contextmenu", (event: any, d: any) => {
+        event.preventDefault();
+        setPopover({
+          isOpen: true,
+          x: event.clientX,
+          y: event.clientY,
+          targetId: d.id,
+          targetType: 'node'
+        });
+      });
 
     // Node circles
     node
@@ -273,6 +332,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         .attr("y2", (d: any) => d.target.y);
 
       node.attr("transform", (d: any) => `translate(${d.x},${d.y})`);
+      setTick(t => t + 1); // trigger react render for annotations
     });
 
     // Zoom behavior
@@ -281,6 +341,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .scaleExtent([0.5, 3])
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
+        setTransform({ x: event.transform.x, y: event.transform.y, k: event.transform.k });
       });
 
     svg.call(zoom as any);
@@ -317,6 +378,39 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     }
   };
 
+  const handleSaveAnnotation = async (data: Partial<MapAnnotation>) => {
+    if (!repository?.id || !popover) return;
+    
+    try {
+      if (popover.initialData?.id) {
+        await annotationService.updateAnnotation(popover.initialData.id, data);
+        toast.success("Annotation updated");
+      } else {
+        await annotationService.createAnnotation({
+          ...data,
+          repositoryId: repository.id,
+          targetId: popover.targetId,
+          targetType: popover.targetType
+        });
+        toast.success("Annotation created");
+      }
+      setPopover(null);
+    } catch (e) {
+      toast.error("Failed to save annotation");
+    }
+  };
+
+  const handleDeleteAnnotation = async () => {
+    if (!popover?.initialData?.id) return;
+    try {
+      await annotationService.deleteAnnotation(popover.initialData.id);
+      toast.success("Annotation deleted");
+      setPopover(null);
+    } catch (e) {
+      toast.error("Failed to delete annotation");
+    }
+  };
+
   return (
     <div className="relative">
       <Card className="glass p-4 sm:p-6 overflow-hidden">
@@ -330,6 +424,13 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 text-xs">
+            <button
+              onClick={() => setPanelOpen(true)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-colors font-medium"
+            >
+              <MessageSquarePlus size={14} />
+              Annotations ({annotations.length})
+            </button>
             <div className="flex gap-3">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-purple-500 flex-shrink-0" />
@@ -361,8 +462,51 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
                 viewBox="0 0 900 600"
                 preserveAspectRatio="xMidYMid meet"
               />
+              <div 
+                className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-visible"
+                style={{
+                  transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.k})`,
+                  transformOrigin: '0 0'
+                }}
+              >
+                {annotations.map(a => {
+                  let x = 0;
+                  let y = 0;
+                  if (a.targetType === 'node') {
+                    const node = nodesRef.current.find(n => n.id === a.targetId);
+                    if (node) {
+                      x = node.x;
+                      y = node.y;
+                    }
+                  } else if (a.targetType === 'edge') {
+                    const parts = a.targetId.split('->');
+                    const link = linksRef.current.find(l => l.source.id === parts[0] && l.target.id === parts[1]);
+                    if (link) {
+                      x = (link.source.x + link.target.x) / 2;
+                      y = (link.source.y + link.target.y) / 2;
+                    }
+                  }
+                  if (x === 0 && y === 0) return null; // Wait for nodes to be initialized
+                  
+                  return (
+                    <div key={a.id} className="absolute pointer-events-auto" style={{ left: x, top: y }}>
+                      <AnnotationMarker 
+                        annotation={a} 
+                        x={0} 
+                        y={0} 
+                        onClick={() => setPopover({
+                          isOpen: true,
+                          x: 0, // In this case we might want to center the popover or use mouse coordinates
+                          y: 0,
+                          initialData: a
+                        })} 
+                      />
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <div className="absolute bottom-2 right-3 text-[10px] text-white/70">
+            <div className="absolute bottom-2 right-3 text-[10px] text-white/70 pointer-events-none">
               GitVerse • {repository?.name || "Repository"}
             </div>
           </div>
@@ -378,7 +522,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         </div>
 
         <p className="text-xs text-muted-foreground mt-2 px-4 sm:px-0">
-          💡 Drag nodes to reposition • Scroll to zoom • Hover for details
+          💡 Drag nodes to reposition • Scroll to zoom • Hover for details • Right-click to annotate
         </p>
 
         <div
@@ -394,6 +538,39 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             top: "0px",
             whiteSpace: "nowrap",
           }}
+        />
+
+        {popover?.isOpen && (
+          <AnnotationPopover 
+            x={popover.initialData ? transform.x + (nodesRef.current.find(n => n.id === popover.initialData?.targetId)?.x || 0) * transform.k : popover.x}
+            y={popover.initialData ? transform.y + (nodesRef.current.find(n => n.id === popover.initialData?.targetId)?.y || 0) * transform.k : popover.y}
+            initialData={popover.initialData}
+            onSave={handleSaveAnnotation}
+            onCancel={() => setPopover(null)}
+            onDelete={popover.initialData?.id ? handleDeleteAnnotation : undefined}
+          />
+        )}
+
+        <AnnotationPanel 
+          isOpen={panelOpen} 
+          onClose={() => setPanelOpen(false)} 
+          annotations={annotations} 
+          onSelect={(a) => {
+            let x = 0, y = 0;
+            if (a.targetType === 'node') {
+              const node = nodesRef.current.find(n => n.id === a.targetId);
+              if (node) { x = node.x; y = node.y; }
+            }
+            // Animate D3 zoom to annotation
+            if (svgRef.current && (x !== 0 || y !== 0)) {
+              const width = svgRef.current.clientWidth;
+              const height = svgRef.current.clientHeight;
+              d3.select(svgRef.current)
+                .transition()
+                .duration(750)
+                .call(d3.zoom().transform as any, d3.zoomIdentity.translate(width/2, height/2).scale(1.5).translate(-x, -y));
+            }
+          }} 
         />
       </Card>
     </div>

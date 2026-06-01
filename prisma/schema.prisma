@@ -56,6 +56,8 @@ model User {
   loginAttempts           LoginAttempt[]
   aiRequestLogs           AiRequestLog[]
   organizationMemberships OrganizationMember[]
+  mapAnnotations        MapAnnotation[]
+  annotationActivities  AnnotationActivity[]
 
   @@map("users")
 }
@@ -209,6 +211,7 @@ model Repository {
   securitySandboxes   SecuritySandbox[]
   reviewPolicies      ReviewPolicy[]
   policyAssignment    RepositoryPolicyAssignment?
+  mapAnnotations      MapAnnotation[]
 
   @@index([url])
   @@index([userId])
@@ -609,3 +612,41 @@ model AuditLog {
   @@index([repositoryId, createdAt(sort: Desc)])
   @@map("audit_logs")
 }
+
+model MapAnnotation {
+  id              String               @id @default(uuid()) @db.Uuid
+  repositoryId    Int                  @map("repository_id")
+  authorId        Int                  @map("author_id")
+  targetType      String               @map("target_type") // 'node' | 'edge'
+  targetId        String               @map("target_id")
+  content         String               @db.Text
+  annotationType  String               @map("annotation_type") // 'comment' | 'warning' | 'technical-debt' | 'refactor' | 'documentation' | 'issue-link'
+  positionX       Float?               @map("position_x")
+  positionY       Float?               @map("position_y")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+
+  repository      Repository           @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  author          User                 @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  activities      AnnotationActivity[]
+
+  @@index([repositoryId])
+  @@index([targetId])
+  @@map("map_annotations")
+}
+
+model AnnotationActivity {
+  id              String        @id @default(uuid()) @db.Uuid
+  annotationId    String        @map("annotation_id") @db.Uuid
+  userId          Int           @map("user_id")
+  action          String        // 'created' | 'updated' | 'deleted'
+  details         Json?
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  annotation      MapAnnotation @relation(fields: [annotationId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([annotationId, createdAt(sort: Desc)])
+  @@map("annotation_activities")
+}
+
