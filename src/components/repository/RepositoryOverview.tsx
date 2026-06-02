@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, Children, isValidElement } from "react";
 import {
   GitBranch,
   Star,
@@ -37,6 +38,7 @@ import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/hooks/use-toast";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
+import { FavoriteButton } from "./FavoriteButton";
 
 
 interface RepositoryData {

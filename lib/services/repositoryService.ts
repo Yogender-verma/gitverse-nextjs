@@ -8,6 +8,8 @@ import { invalidateGeminiAnalysisCacheForRepository } from "./geminiAnalysisCach
 import { FileChangeType } from "@prisma/client";
 import { repoSyncLimiter } from "../utils/concurrencyLimiter";
 import { withDbRetry } from "../utils/dbRetry";
+import { ParsedRepositoryKnowledge, gitverseConfigParser } from "../parsers/gitverseConfigParser";
+import { repositoryKnowledgeService } from "./repositoryKnowledgeService";
 
 function yieldIfHighMemory(threshold = 0.7): Promise<void> {
   const usage = process.memoryUsage();
