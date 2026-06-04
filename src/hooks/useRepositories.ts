@@ -92,8 +92,7 @@ export function useRepositories({ limit = DEFAULT_LIMIT } = {}): UseRepositories
           return [...prev, ...filtered];
         });
 
-        setCursor(newCursor);
-        cursorRef.current = nextCursor;
+        cursorRef.current = newCursor;
         setHasMore(newHasMore);
       } catch (err: any) {
         if (err.name !== "CanceledError" && err.name !== "AbortError" && !axios.isCancel(err)) {
