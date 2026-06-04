@@ -225,6 +225,9 @@ model Repository {
   status              String                      @default("pending") // pending, analyzing, completed, failed
   userId                       Int                           @map("user_id")
   user                         User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentId                     Int?                          @map("parent_id")
+  parent                       Repository?                   @relation("RepositorySubPackages", fields: [parentId], references: [id])
+  subPackages                  Repository[]                  @relation("RepositorySubPackages")
   createdAt                    DateTime                      @default(now()) @map("created_at")
   updatedAt                    DateTime                      @updatedAt @map("updated_at")
   branches                     Branch[]
@@ -430,10 +433,8 @@ model FileChange {
   file       File?          @relation(fields: [fileId], references: [id], onDelete: SetNull)
   createdAt  DateTime       @default(now()) @map("created_at")
 
-  @@index([fileId])
+  @@index([fileId], map: "file_changes_file_id_idx")
   @@index([commitId])
-  // FK for onDelete: SetNull cascade and future file-scoped change queries
-  @@index([fileId])
   @@map("file_changes")
 }
 
