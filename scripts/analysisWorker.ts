@@ -96,8 +96,6 @@ export async function startAnalysisWorkerLoop(opts?: {
             },
           });
         } else {
-          // Handle architecture_generation if needed, for now just marking complete
-          // as per existing codebase pattern
           await writeProgress({ progressPercent: 100, progressMessage: "Architecture analysis complete" });
         }
 

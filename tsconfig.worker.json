@@ -17,8 +17,8 @@
     "lib/**/*.ts"
   ],
   "exclude": [
-    "lib/**/__tests__/**",
-    "lib/**/*.test.ts",
-    "lib/**/*.spec.ts"
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.spec.ts"
   ]
 }
