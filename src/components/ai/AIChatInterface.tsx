@@ -1,3 +1,5 @@
+"use client";
+
 import { Input } from "@/components/ui/Input";
 import { useState, useRef, useEffect } from "react";
 import { Send, Loader2, Sparkles, User, Bot, Copy, Check, Square } from "lucide-react";
