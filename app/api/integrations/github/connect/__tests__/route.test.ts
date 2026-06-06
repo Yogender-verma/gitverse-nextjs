@@ -58,8 +58,23 @@ jest.mock("@/services/security/redact-sensitive-fields", () => ({
   },
 }));
 
+function mockToJsonSafe(value: unknown): unknown {
+  if (typeof value === "bigint") return value.toString();
+  if (value === null || value === undefined) return value;
+  if (Array.isArray(value)) return value.map(mockToJsonSafe);
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(obj)) {
+      out[key] = mockToJsonSafe(v);
+    }
+    return out;
+  }
+  return value;
+}
+
 jest.mock("@/lib/utils/jsonSafe", () => ({
-  toJsonSafe: jest.fn((obj) => obj),
+  toJsonSafe: jest.fn(mockToJsonSafe),
 }));
 
 import { POST } from "../route";
@@ -89,6 +104,9 @@ describe("POST /api/integrations/github/connect", () => {
       updatedAt: new Date(),
     });
     mockEncryptToken.mockImplementation(async (token: string) => `encrypted:${token}`);
+    (GitHubService as jest.Mock).mockImplementation(() => ({
+      getAuthenticatedUser: jest.fn().mockResolvedValue({ id: 12345, login: "testuser" }),
+    }));
   });
 
   describe("encryption pre-flight check", () => {
