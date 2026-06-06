@@ -21,8 +21,8 @@ import {
   getMfaStatus,
   verifyTOTP,
   disableMfa,
+  getDecryptedTotpSecret,
 } from "@/lib/mfa";
-import { decryptToken } from "@/lib/utils/envelopeEncryption";
 import { logAuditEvent } from "@/lib/auditLogger";
 import {
   checkRateLimit,
@@ -157,21 +157,21 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const mfaConfig = await prisma.mfaConfig.findUnique({
-      where: { userId: user.userId },
-      select: { totpSecret: true, isEnabled: true, tokenEncrypted: true },
-    });
-
-    if (!mfaConfig?.isEnabled) {
+    const status = await getMfaStatus(user.userId);
+    if (!status?.isEnabled) {
       return NextResponse.json(
         { error: "MFA is not currently enabled." },
         { status: 409 },
       );
     }
 
-    const secret = mfaConfig.tokenEncrypted
-      ? await decryptToken(mfaConfig.totpSecret)
-      : mfaConfig.totpSecret;
+    const secret = await getDecryptedTotpSecret(user.userId);
+    if (!secret) {
+      return NextResponse.json(
+        { error: "MFA configuration is missing." },
+        { status: 409 },
+      );
+    }
 
     if (!verifyTOTP(secret, token)) {
       await logAuditEvent({

@@ -24,8 +24,8 @@ import {
   enableMfa,
   generateBackupCodes,
   verifyAndConsumeBackupCode,
+  getDecryptedTotpSecret,
 } from "@/lib/mfa";
-import { decryptToken } from "@/lib/utils/envelopeEncryption";
 import { logAuditEvent } from "@/lib/auditLogger";
 import {
   checkRateLimit,
@@ -76,26 +76,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch MFA config
-    const mfaConfig = await prisma.mfaConfig.findUnique({
-      where: { userId: user.userId },
-      select: { totpSecret: true, isEnabled: true, tokenEncrypted: true },
-    });
-
-    if (!mfaConfig?.totpSecret) {
+    // Decrypt the stored TOTP secret (exists after /api/auth/mfa/setup)
+    const secret = await getDecryptedTotpSecret(user.userId);
+    if (!secret) {
       return NextResponse.json(
         { error: "MFA not initialized. Call /api/auth/mfa/setup first." },
         { status: 409 },
       );
     }
 
-    const secret = mfaConfig.tokenEncrypted
-      ? await decryptToken(mfaConfig.totpSecret)
-      : mfaConfig.totpSecret;
+    // Check whether MFA is fully enabled
+    const mfaConfig = await prisma.mfaConfig.findUnique({
+      where: { userId: user.userId },
+      select: { isEnabled: true },
+    });
+
+    const isEnabled = mfaConfig?.isEnabled ?? false;
 
     // ── Backup Code Path ───────────────────────────────────────────────────
     if (backupCode) {
-      if (!mfaConfig.isEnabled) {
+      if (!isEnabled) {
         return NextResponse.json(
           { error: "MFA must be enabled before using backup codes." },
           { status: 409 },
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
 
     // ── Enrollment Activation ──────────────────────────────────────────────
     if (mode === "enroll") {
-      if (mfaConfig.isEnabled) {
+      if (isEnabled) {
         return NextResponse.json(
           { error: "MFA is already enrolled and active." },
           { status: 409 },
@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Authentication Verification ────────────────────────────────────────
-    if (!mfaConfig.isEnabled) {
+    if (!isEnabled) {
       return NextResponse.json(
         { error: "MFA is not enabled for this account." },
         { status: 409 },

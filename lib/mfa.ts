@@ -243,18 +243,19 @@ export async function verifyAndConsumeBackupCode(
 // ─── Database Helpers ────────────────────────────────────────────────────────
 
 /**
- * Retrieves MFA status for a user.
+ * Retrieves MFA enabled status for a user.
+ * Does not return the TOTP secret to avoid leaking encrypted (or plaintext) bytes.
  */
 export async function getMfaStatus(
   userId: number,
-): Promise<{ isEnabled: boolean; hasSecret: boolean } | null> {
+): Promise<{ isEnabled: boolean } | null> {
   const config = await prisma.mfaConfig.findUnique({
     where: { userId },
-    select: { isEnabled: true, totpSecret: true },
+    select: { isEnabled: true },
   });
 
-  if (!config) return { isEnabled: false, hasSecret: false };
-  return { isEnabled: config.isEnabled, hasSecret: !!config.totpSecret };
+  if (!config) return { isEnabled: false };
+  return { isEnabled: config.isEnabled };
 }
 
 /**
