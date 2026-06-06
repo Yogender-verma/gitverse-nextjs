@@ -544,12 +544,14 @@ model WebhookEvent {
   payload     Json
   status      String    @default("pending") // pending, processing, completed, failed, rate_limited
   error       String?   @db.Text
+  deliveryId  String?   @map("delivery_id") // X-GitHub-Delivery header for idempotency
   retryCount  Int       @default(0) @map("retry_count")
   maxRetries  Int       @default(3) @map("max_retries")
   nextRetryAt DateTime? @map("next_retry_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
+  @@index([deliveryId])
   @@index([status, createdAt])
   @@index([status, nextRetryAt])
   @@map("webhook_events")

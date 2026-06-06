@@ -24,6 +24,7 @@ import { CheckRecoveryService } from "../services/check-recovery";
 import { PRImpactAnalysisService } from "../services/prImpactAnalysisService";
 import { RepositorySyncQueue } from "../services/repositorySyncQueue";
 import { classifyRetry } from "../utils/retry";
+import { generateWebhookKey, completeIdempotency, failIdempotency, releaseIdempotency } from "../utils/idempotency";
 
 async function processWebhookEvent(eventId: string): Promise<void> {
   const webhookEvent = await prisma.webhookEvent.findUnique({
@@ -42,6 +43,11 @@ async function processWebhookEvent(eventId: string): Promise<void> {
     where: { id: eventId },
     data: { status: "processing" },
   });
+
+  const deliveryId = webhookEvent.deliveryId;
+  const idempotencyKey = deliveryId ? generateWebhookKey(deliveryId, webhookEvent.event, webhookEvent.action || undefined) : null;
+  const markIdempotentCompleted = async () => { if (idempotencyKey) await completeIdempotency(idempotencyKey).catch(() => {}); };
+  const markIdempotentFailed = async () => { if (idempotencyKey) await failIdempotency(idempotencyKey).catch(() => {}); };
 
   const timeoutEstimator = new TimeoutEstimatorService();
   let globalCheckRunId: number | null = null;
@@ -74,6 +80,7 @@ async function processWebhookEvent(eventId: string): Promise<void> {
     });
 
     if (!enabledRepo) {
+      await markIdempotentCompleted();
       await prisma.webhookEvent.update({
         where: { id: eventId },
         data: { status: "completed", error: "Repo not enabled" },
@@ -90,6 +97,7 @@ async function processWebhookEvent(eventId: string): Promise<void> {
     globalGithubToken = installationToken;
 
     if (process.env.DISABLE_AI_ANALYSIS === "true") {
+      await markIdempotentCompleted();
       await prisma.webhookEvent.update({
         where: { id: eventId },
         data: { status: "completed", error: "AI analysis is globally disabled" },
@@ -119,6 +127,7 @@ async function processWebhookEvent(eventId: string): Promise<void> {
 
     if (webhookEvent.event === "push") {
       const enqueued = await RepositorySyncQueue.enqueueSyncJob(enabledRepo.id, "push");
+      await markIdempotentCompleted();
       await prisma.webhookEvent.update({
         where: { id: eventId },
         data: { status: "completed" },
@@ -147,6 +156,7 @@ async function processWebhookEvent(eventId: string): Promise<void> {
         githubToken: installationToken,
       });
 
+      await markIdempotentCompleted();
       await prisma.webhookEvent.update({
         where: { id: eventId },
         data: { status: "completed" },
@@ -204,6 +214,7 @@ async function processWebhookEvent(eventId: string): Promise<void> {
       });
     } catch (e: any) {
       if (e?.code === "P2002") {
+        await markIdempotentCompleted();
         await prisma.webhookEvent.update({
           where: { id: eventId },
           data: { status: "completed", error: "Already reviewed (deduped)" },
@@ -330,6 +341,7 @@ async function processWebhookEvent(eventId: string): Promise<void> {
       const checkSummary = CheckSummaryService.generateSummary(finalPolicyOutput);
       await githubChecks.completeCheckRun(owner, repo, checkRunId, finalPolicyOutput.status, checkSummary);
 
+      await markIdempotentCompleted();
       await prisma.webhookEvent.update({
         where: { id: eventId },
         data: { status: "completed" },
@@ -359,6 +371,13 @@ async function processWebhookEvent(eventId: string): Promise<void> {
       maxRetries: webhookEvent?.maxRetries ?? 3,
       error,
     });
+
+    if (retryDecision.shouldRetry) {
+      // Release so a retry can re-acquire the idempotency key
+      if (idempotencyKey) await releaseIdempotency(idempotencyKey).catch(() => {});
+    } else {
+      await markIdempotentFailed();
+    }
 
     await prisma.webhookEvent.update({
       where: { id: eventId },
